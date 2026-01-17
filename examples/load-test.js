@@ -84,7 +84,7 @@ async function runLoadTest() {
   const loadTestConfig = {
     url: SERVER_URL,
     connections: 10,        // Number of concurrent connections
-    duration: 10,           // Test duration in seconds
+    duration: 30,           // Test duration in seconds
     pipelining: 1,          // Requests per connection
     requests: [
       {

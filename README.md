@@ -190,8 +190,6 @@ Memory Growth:
 3. **Reproducible**: You can run the test multiple times to confirm fixes
 4. **Measurable**: Concrete numbers show memory growth over time
 
-**Fix**: Always clear timers with `clearTimeout()` and `clearInterval()` when objects are no longer needed.
-
 ## Node.js Built-in Tools for Memory Leak Detection
 
 ### 1. process.memoryUsage()
