@@ -6,9 +6,10 @@ A comprehensive Node.js 24 demo that teaches developers how to identify and fix 
 
 - ✅ **ES Modules** - Uses `"type": "module"` for modern JavaScript
 - ✅ **Node.js 24+** - Requires Node.js 24 or higher
-- ✅ **Zero Dependencies** - Uses only Node.js built-in APIs
+- ✅ **Minimal Dependencies** - Uses only Node.js built-in APIs (autocannon for load testing)
 - ✅ **Practical Examples** - Real-world memory leak scenarios
 - ✅ **Built-in Tools** - Demonstrates native Node.js profiling tools
+- ✅ **Production Reproduction** - Load testing with autocannon to simulate production issues
 
 ## Prerequisites
 
@@ -23,7 +24,7 @@ node --version  # Should be >= 24.0.0
 ```bash
 git clone <repository-url>
 cd node-memory-leak
-npm install  # No dependencies, but sets up the project
+npm install  # Installs autocannon for load testing
 ```
 
 ## Quick Start
@@ -95,6 +96,99 @@ npm run leak:timer
 - How intervals prevent garbage collection
 - Memory growth from running timers
 - Why clearing object references isn't enough
+
+**Fix**: Always clear timers with `clearTimeout()` and `clearInterval()` when objects are no longer needed.
+
+## Reproducing Production Issues Locally
+
+### Load Testing with Autocannon and --inspect
+
+One of the best ways to identify memory leaks is to reproduce production conditions locally. This demo includes a leaky HTTP server and load testing tools to simulate production traffic.
+
+#### Step 1: Start the Leaky Server
+
+```bash
+# Start server with Chrome DevTools integration
+npm run server:inspect
+```
+
+This starts an HTTP server with intentional memory leaks:
+- Request cache that grows indefinitely
+- User sessions that never expire
+- Database connections that are never released
+
+#### Step 2: Connect Chrome DevTools
+
+1. Open Chrome and navigate to `chrome://inspect`
+2. Click "inspect" under your Node.js process
+3. Go to the "Memory" tab
+4. Take a **Heap Snapshot** (this is your baseline)
+
+#### Step 3: Run Load Test
+
+In a separate terminal, run the load test:
+
+```bash
+npm run loadtest
+```
+
+This uses **autocannon** to generate realistic HTTP load:
+- 10 concurrent connections
+- 30 second duration
+- Multiple endpoints tested
+- Real-time progress tracking
+
+#### Step 4: Analyze Memory Growth
+
+After the load test completes:
+1. Take another **Heap Snapshot** in Chrome DevTools
+2. Select "Comparison" view
+3. Look for objects that grew significantly
+4. Identify: `requestCache`, `userSessions`, `connections`
+
+#### Step 5: Identify Root Causes
+
+In the comparison view, you'll see:
+- **Shallow Size**: Memory used by the object itself
+- **Retained Size**: Total memory kept alive by the object
+- **Retainers**: What's preventing garbage collection
+
+Look for patterns like:
+- Arrays growing with each request
+- Maps/Sets that never clear
+- Event listeners not being removed
+- Timers still running
+
+### Example Output
+
+```bash
+═══════════════════════════════════════════════════════════
+Memory Leak Analysis:
+═══════════════════════════════════════════════════════════
+Before Load Test:
+  Heap Used: 4 MB
+  Cached Requests: 0
+  Active Sessions: 0
+  Connections: 0
+
+After Load Test:
+  Heap Used: 156 MB
+  Cached Requests: 5000
+  Active Sessions: 5000
+  Connections: 5000
+
+Memory Growth:
+  Leaked Requests: 5000
+  Leaked Sessions: 5000
+  Leaked Connections: 5000
+```
+
+### Why This Approach Works
+
+1. **Realistic Load**: Autocannon simulates real production traffic patterns
+2. **Visual Debugging**: Chrome DevTools makes it easy to see what's growing
+3. **Reproducible**: You can run the test multiple times to confirm fixes
+4. **Measurable**: Concrete numbers show memory growth over time
 
 **Fix**: Always clear timers with `clearTimeout()` and `clearInterval()` when objects are no longer needed.
 

@@ -14,7 +14,10 @@
     "leak:events": "node examples/leak-events.js",
     "leak:timer": "node examples/leak-timer.js",
     "inspect": "node --inspect examples/demo.js",
-    "heap-prof": "node --heap-prof examples/demo.js"
+    "heap-prof": "node --heap-prof examples/demo.js",
+    "server": "node examples/leaky-server.js",
+    "server:inspect": "node --inspect examples/leaky-server.js",
+    "loadtest": "node examples/load-test.js"
   },
   "keywords": [
     "memory-leak",
@@ -24,5 +27,8 @@
     "performance"
   ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "autocannon": "^7.15.0"
+  }
 }

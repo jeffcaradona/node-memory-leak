@@ -17,6 +17,11 @@ npm run inspect        # Then open chrome://inspect
 
 # Generate heap profile
 npm run heap-prof      # Creates .heapprofile file
+
+# Reproduce production issues locally
+npm run server         # Start leaky HTTP server
+npm run server:inspect # Start server with inspect flag
+npm run loadtest       # Run autocannon load test
 ```
 
 ## Memory Monitoring Code Snippet
@@ -103,6 +108,7 @@ function createHandler() {
 
 ## Debugging Workflow
 
+### Standard Workflow
 1. **Identify** - Notice memory growing over time
 2. **Measure** - Use `process.memoryUsage()` to confirm
 3. **Profile** - Take heap snapshots with `--inspect`
@@ -110,6 +116,17 @@ function createHandler() {
 5. **Locate** - Find retaining objects
 6. **Fix** - Remove references, add cleanup
 7. **Verify** - Test with `--expose-gc`
+
+### Production Issue Reproduction Workflow
+1. **Start Server with Inspect** - `npm run server:inspect`
+2. **Connect DevTools** - Open `chrome://inspect` in Chrome
+3. **Take Baseline Snapshot** - Memory tab > Heap Snapshot
+4. **Generate Load** - `npm run loadtest` in another terminal
+5. **Take Second Snapshot** - After load test completes
+6. **Compare Snapshots** - Use "Comparison" view in DevTools
+7. **Identify Leaks** - Look for `requestCache`, `userSessions`, etc.
+8. **Fix Code** - Remove references, add cleanup
+9. **Verify Fix** - Run load test again and compare snapshots
 
 ## Node.js Flags
 
