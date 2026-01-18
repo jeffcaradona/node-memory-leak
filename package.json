@@ -1,0 +1,34 @@
+{
+  "name": "node-memory-leak-demo",
+  "version": "1.0.0",
+  "description": "A Node.js 24 Demo to help identify memory leaks using built-in tools",
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "demo": "node --expose-gc examples/demo.js",
+    "leak:global": "node examples/leak-global.js",
+    "leak:closure": "node examples/leak-closure.js",
+    "leak:events": "node examples/leak-events.js",
+    "leak:timer": "node examples/leak-timer.js",
+    "inspect": "node --inspect examples/demo.js",
+    "heap-prof": "node --heap-prof examples/demo.js",
+    "server": "node examples/leaky-server.js",
+    "server:inspect": "node --inspect examples/leaky-server.js",
+    "loadtest": "node examples/load-test.js"
+  },
+  "keywords": [
+    "memory-leak",
+    "nodejs",
+    "profiling",
+    "debugging",
+    "performance"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "autocannon": "^7.15.0"
+  }
+}
