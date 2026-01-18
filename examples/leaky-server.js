@@ -15,6 +15,20 @@ import { getMemorySnapshot, formatMemorySnapshot, pipe, curry2 } from '../lib/fu
 
 // ===== FUNCTIONAL STATE MANAGEMENT =====
 
+/**
+ * IMPORTANT: This mutable state is INTENTIONALLY problematic!
+ * 
+ * This breaks functional programming principles to demonstrate memory leaks.
+ * In production functional code, you should:
+ * 1. Pass state explicitly through function parameters
+ * 2. Return new state instead of mutating
+ * 3. Use immutable data structures
+ * 4. Implement proper cleanup/disposal patterns
+ * 
+ * This server demonstrates that even with functional patterns,
+ * leaks occur if you hold references to data in module scope.
+ */
+
 // Pure function: Create initial server state
 const createInitialState = () => Object.freeze({
   requestCache: [],
@@ -23,7 +37,7 @@ const createInitialState = () => Object.freeze({
   requestCount: 0
 });
 
-// Mutable state (for leak demonstration)
+// Mutable state (for leak demonstration - NOT a functional pattern!)
 let serverState = createInitialState();
 
 // ===== PURE REQUEST DATA TRANSFORMATIONS =====
@@ -193,7 +207,16 @@ const routeRequest = (req, res) => {
 
 // ===== FUNCTIONAL MIDDLEWARE COMPOSITION =====
 
-// Compose middleware pipeline
+/**
+ * Compose middleware pipeline
+ * 
+ * This creates a chain where each middleware can call the next one.
+ * The execution flows from first to last middleware, then to the handler.
+ * 
+ * Example flow:
+ *   applyMiddleware(m1, m2, m3)(req, res, handler)
+ *   -> m1 executes -> m2 executes -> m3 executes -> handler executes
+ */
 const applyMiddleware = (...middlewares) => (req, res, handler) => {
   middlewares.reduce(
     (next, middleware) => () => middleware(req, res, next),

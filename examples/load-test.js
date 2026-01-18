@@ -43,9 +43,9 @@ const createLoadTestConfig = (url, options = {}) =>
 // Pure function: Parse JSON response
 const parseJson = data => {
   try {
-    return { success: true, data: JSON.parse(data) };
+    return { success: true, data: JSON.parse(data), error: null };
   } catch (error) {
-    return { success: false, error: error.message };
+    return { success: false, data: null, error: error.message };
   }
 };
 
