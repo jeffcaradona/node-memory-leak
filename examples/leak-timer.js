@@ -1,11 +1,17 @@
 /**
- * Example: Timer/Interval Memory Leak
+ * Example: Timer/Interval Memory Leak (Functional Approach)
  * 
- * This demonstrates how forgotten timers and intervals can cause memory leaks
- * by keeping callbacks and their closures alive indefinitely.
+ * Demonstrates functional patterns for timer management:
+ * - Pure timer factory functions
+ * - Explicit cleanup composition
+ * - Functional resource lifecycle management
  */
 
-class DataCache {
+import { createTimerCleanup, getMemorySnapshot, logMemorySnapshot } from '../lib/functional-utils.js';
+
+// ===== LEAKY PATTERN (Class without cleanup) =====
+
+class LeakyCache {
   constructor(id) {
     this.id = id;
     this.cache = new Array(100000).fill(`cache-${id}`); // ~1MB
@@ -13,43 +19,102 @@ class DataCache {
   }
   
   startLeakyTimer() {
-    // Timer keeps the entire object alive even if we're done with it
+    // Timer keeps the entire object alive
     this.interval = setInterval(() => {
       this.updateCount++;
       this.cache.push(`update-${this.updateCount}`);
     }, 100);
   }
   
-  // Forgot to add cleanup method!
+  // Forgot cleanup method - LEAK!
 }
 
-const caches = [];
+// ===== FUNCTIONAL PATTERN: Explicit Cleanup =====
 
-function logMemoryUsage(label) {
-  const used = process.memoryUsage();
-  console.log(`${label}:`);
-  console.log(`  Heap Used: ${Math.round(used.heapUsed / 1024 / 1024)} MB`);
-  console.log(`  Active Caches: ${caches.length}\n`);
-}
+// Pure function: Create cache data
+const createCacheData = (id, size = 100000) => ({
+  id,
+  cache: new Array(size).fill(`cache-${id}`),
+  updateCount: 0
+});
 
-console.log('=== Timer/Interval Memory Leak Example ===\n');
-logMemoryUsage('Initial state');
+// Pure function: Update cache (returns new state)
+const updateCache = state => ({
+  ...state,
+  updateCount: state.updateCount + 1,
+  cache: [...state.cache, `update-${state.updateCount + 1}`]
+});
 
-console.log('Creating 20 caches with intervals...\n');
-for (let i = 0; i < 20; i++) {
-  const cache = new DataCache(i);
+// Functional cache with explicit lifecycle
+const createManagedCache = (id, interval = 100) => {
+  let state = createCacheData(id);
+  
+  // Side effect: timer that updates internal state
+  const timerId = setInterval(() => {
+    state = updateCache(state);
+  }, interval);
+  
+  // Return state accessor and cleanup function
+  return {
+    getState: () => ({ ...state }), // Return copy to maintain immutability
+    cleanup: createTimerCleanup(timerId)
+  };
+};
+
+// ===== HIGHER-ORDER FUNCTION: Generic Timer Management =====
+
+// HOF: Create a timer with automatic cleanup
+const withTimer = (fn, intervalMs) => {
+  const timerId = setInterval(fn, intervalMs);
+  return createTimerCleanup(timerId);
+};
+
+// HOF: Create a timeout-based auto-cleanup timer
+const createSelfCleaningTimer = (fn, intervalMs, lifetimeMs) => {
+  const timerId = setInterval(fn, intervalMs);
+  
+  setTimeout(() => {
+    clearInterval(timerId);
+  }, lifetimeMs);
+  
+  return createTimerCleanup(timerId);
+};
+
+// ===== DEMONSTRATION =====
+
+const leakyCaches = [];
+const managedCaches = [];
+
+const logMemoryWithCounts = (label, leakyCount, managedCount) => {
+  const snapshot = getMemorySnapshot();
+  logMemorySnapshot(label, snapshot);
+  console.log(`  Leaky Caches: ${leakyCount}`);
+  console.log(`  Managed Caches: ${managedCount}\n`);
+};
+
+console.log('=== Timer/Interval Memory Leak (Functional Approach) ===\n');
+console.log('Functional programming principles:');
+console.log('1. Return cleanup functions alongside resources');
+console.log('2. Use HOFs for reusable timer patterns');
+console.log('3. Make resource lifecycle explicit\n');
+
+logMemoryWithCounts('Initial state', 0, 0);
+
+console.log('--- Part 1: Leaky Pattern (no cleanup) ---\n');
+for (let i = 0; i < 15; i++) {
+  const cache = new LeakyCache(i);
   cache.startLeakyTimer();
-  caches.push(cache);
+  leakyCaches.push(cache);
 }
 
-logMemoryUsage('After creating caches');
+logMemoryWithCounts('After creating leaky caches', leakyCaches.length, 0);
 
-console.log('Waiting 2 seconds for timers to run...\n');
+console.log('Waiting 1 second for timers to run...\n');
 setTimeout(() => {
-  logMemoryUsage('After 2 seconds');
+  logMemoryWithCounts('After 1 second (timers running)', leakyCaches.length, 0);
   
   console.log('Attempting to clear caches array...');
-  caches.length = 0;
+  leakyCaches.length = 0;
   
   if (global.gc) {
     global.gc();
@@ -57,35 +122,53 @@ setTimeout(() => {
   }
   
   setTimeout(() => {
-    logMemoryUsage('After clearing caches array');
+    logMemoryWithCounts('After clearing array (timers STILL running!)', 0, 0);
     
-    console.log('Notice: Memory continues to grow! Intervals keep running and prevent garbage collection.');
-    console.log('Fix: Always clear timers/intervals when objects are no longer needed.');
-    console.log('\nExample fix:');
-    console.log(`
-class DataCache {
-  startTimer() {
-    this.interval = setInterval(() => {
-      this.updateCount++;
-    }, 100);
-  }
-  
-  cleanup() {
-    if (this.interval) {
-      clearInterval(this.interval);
-      this.interval = null;
+    console.log('--- Part 2: Functional Pattern (with cleanup) ---\n');
+    
+    for (let i = 0; i < 10; i++) {
+      const cache = createManagedCache(i + 15);
+      managedCaches.push(cache);
     }
-  }
-}
-
-// Usage:
-const cache = new DataCache(1);
-cache.startTimer();
-// When done:
-cache.cleanup();
-`);
     
-    // Clean up for demo purposes
-    process.exit(0);
+    logMemoryWithCounts('After creating managed caches', 0, managedCaches.length);
+    
+    console.log('Waiting 1 second...\n');
+    setTimeout(() => {
+      logMemoryWithCounts('After 1 second', 0, managedCaches.length);
+      
+      console.log('Calling cleanup functions...');
+      managedCaches.forEach(({ cleanup }) => cleanup());
+      managedCaches.length = 0;
+      
+      if (global.gc) {
+        global.gc();
+        console.log('Forced garbage collection\n');
+      }
+      
+      setTimeout(() => {
+        logMemoryWithCounts('After cleanup (timers stopped!)', 0, 0);
+        
+        console.log('=== Functional Programming Lessons ===\n');
+        console.log('❌ BAD: Start timer without cleanup');
+        console.log('   setInterval(() => doWork(), 100);');
+        console.log('   // No way to stop it!\n');
+        
+        console.log('✅ GOOD: Return cleanup function');
+        console.log('   const timerId = setInterval(() => doWork(), 100);');
+        console.log('   return () => clearInterval(timerId);\n');
+        
+        console.log('✅ BEST: HOF for reusable patterns');
+        console.log('   const withTimer = (fn, interval) => {');
+        console.log('     const id = setInterval(fn, interval);');
+        console.log('     return () => clearInterval(id);');
+        console.log('   };\n');
+        
+        console.log('Functional benefit: Resource lifecycle is explicit');
+        console.log('and cleanup is guaranteed through function composition.');
+        
+        process.exit(0);
+      }, 1000);
+    }, 1000);
   }, 1000);
-}, 2000);
+}, 1000);
