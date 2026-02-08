@@ -1,15 +1,30 @@
-# Node.js Memory Leak Detection Demo
+# Node.js Memory Leak Detection Demo (Functional Programming Approach)
 
-A comprehensive Node.js 24 demo that teaches developers how to identify and fix memory leaks using built-in Node.js tools with minimal external dependencies.
+A comprehensive Node.js 24 demo that teaches developers how to identify and fix memory leaks using **functional programming paradigms** and built-in Node.js tools.
 
 ## Features
 
+- ✅ **Functional Programming** - Demonstrates FP principles for memory management
 - ✅ **ES Modules** - Uses `"type": "module"` for modern JavaScript
 - ✅ **Node.js 24+** - Requires Node.js 24 or higher
 - ✅ **Minimal Dependencies** - Uses only Node.js built-in APIs (autocannon for load testing)
-- ✅ **Practical Examples** - Real-world memory leak scenarios
+- ✅ **Practical Examples** - Real-world memory leak scenarios with functional solutions
 - ✅ **Built-in Tools** - Demonstrates native Node.js profiling tools
 - ✅ **Production Reproduction** - Load testing with autocannon to simulate production issues
+- ✅ **Pragmatic Approach** - Balances FP purity with practical Node.js patterns
+
+## Functional Programming Principles
+
+This demo showcases how to apply functional programming to memory management:
+
+1. **Pure Functions** - Deterministic functions without side effects
+2. **Immutability** - Data transformations instead of mutations
+3. **Function Composition** - Building complex behavior from simple functions
+4. **Explicit Side Effects** - Isolating and managing side effects intentionally
+5. **Higher-Order Functions** - Functions that return functions for reusable patterns
+6. **Explicit Cleanup** - Returning cleanup functions alongside resources
+
+**Key Insight**: Functional programming doesn't prevent memory leaks automatically, but it makes data flow explicit, helping you identify where leaks occur.
 
 ## Prerequisites
 
@@ -29,32 +44,33 @@ npm install  # Installs autocannon for load testing
 
 ## Quick Start
 
-Run the main demo to see all memory leak detection tools:
+Run the main demo to see functional programming patterns for memory leak detection:
 
 ```bash
 npm run demo
 ```
 
-## Memory Leak Examples
+## Memory Leak Examples (Functional Approach)
 
-This demo includes four common types of memory leaks:
+This demo includes four common types of memory leaks, demonstrating both problems and functional solutions:
 
-### 1. Global Variable Leaks
+### 1. Global Variable Leaks (Functional vs Imperative)
 
-**Problem**: Data stored in global variables never gets garbage collected.
+**Problem**: Data accumulating in module scope never gets garbage collected.
 
 ```bash
 npm run leak:global
 ```
 
 **What it demonstrates**:
-- How global variables prevent garbage collection
-- How to monitor memory growth with `process.memoryUsage()`
-- The impact of accumulating data in global scope
+- Imperative approach with mutations (hidden data flow)
+- Functional approach with immutability (explicit data flow)
+- Why both can leak if references are retained
+- **Functional fix**: Pass state explicitly through parameters instead of accumulating in module scope
 
-**Fix**: Use local variables, clear arrays when done, or use proper data structures with cleanup methods.
+**Key Lesson**: Even with immutability, leaks occur if you hold references. The functional benefit is that data flow is explicit, making leaks easier to spot.
 
-### 2. Closure Leaks
+### 2. Closure Leaks (Minimizing Closure Scope)
 
 **Problem**: Closures inadvertently capture large objects in their scope.
 
@@ -64,12 +80,27 @@ npm run leak:closure
 
 **What it demonstrates**:
 - How closures retain references to all variables in their scope
-- Memory impact when many closures capture the same large data
-- The hidden cost of captured variables
+- Memory impact when closures capture large data unnecessarily
+- **Functional solution**: Extract minimal data before creating closures using function composition
+- Using `pipe` to transform data before closure creation
 
-**Fix**: Only capture what you need in closures, extract specific values before creating the closure.
+**Functional Fix**:
+```javascript
+// ❌ Bad: Closure captures entire array
+const createBad = () => {
+  const huge = new Array(1000000);
+  return () => huge.length; // Captures entire array
+};
 
-### 3. Event Listener Leaks
+// ✅ Good: Extract data first using pipe
+const createGood = pipe(
+  () => new Array(1000000),  // Create data
+  data => data.length,       // Extract what we need
+  length => () => length     // Closure only captures number
+);
+```
+
+### 3. Event Listener Leaks (Explicit Cleanup Functions)
 
 **Problem**: Forgotten event listeners keep objects alive that should be garbage collected.
 
@@ -80,11 +111,33 @@ npm run leak:events
 **What it demonstrates**:
 - How event listeners prevent garbage collection
 - The importance of removing listeners
-- Memory retention even after clearing object references
+- **Functional solution**: Return cleanup functions alongside resources
+- Using higher-order functions for reusable event cleanup patterns
 
-**Fix**: Always remove event listeners with `.off()` or `.removeListener()` when objects are no longer needed.
+**Functional Fix**:
+```javascript
+// Pure function: Create event cleanup
+const createEventCleanup = (emitter, event, handler) => 
+  () => emitter.removeListener(event, handler);
 
-### 4. Timer/Interval Leaks
+// Return resource with cleanup
+const createManagedResource = (emitter, id) => {
+  const handler = () => { /* ... */ };
+  emitter.on('event', handler);
+  
+  return {
+    resource: { id },
+    cleanup: createEventCleanup(emitter, 'event', handler)
+  };
+};
+
+// Usage
+const { resource, cleanup } = createManagedResource(emitter, 1);
+// When done:
+cleanup();
+```
+
+### 4. Timer/Interval Leaks (HOF Patterns)
 
 **Problem**: Forgotten timers and intervals keep callbacks and their closures alive indefinitely.
 
@@ -95,9 +148,26 @@ npm run leak:timer
 **What it demonstrates**:
 - How intervals prevent garbage collection
 - Memory growth from running timers
-- Why clearing object references isn't enough
+- **Functional solution**: Higher-order functions that return cleanup functions
+- Composable timer management patterns
 
-**Fix**: Always clear timers with `clearTimeout()` and `clearInterval()` when objects are no longer needed.
+**Functional Fix**:
+```javascript
+// Pure function: Create timer cleanup
+const createTimerCleanup = timerId => 
+  () => clearInterval(timerId);
+
+// HOF: Timer with automatic cleanup
+const withTimer = (fn, intervalMs) => {
+  const timerId = setInterval(fn, intervalMs);
+  return createTimerCleanup(timerId);
+};
+
+// Usage
+const stopTimer = withTimer(() => doWork(), 1000);
+// When done:
+stopTimer();
+```
 
 ## Reproducing Production Issues Locally
 
@@ -264,47 +334,138 @@ if (global.gc) {
 
 **When to use**: Testing cleanup logic, verifying object references are released.
 
-## Memory Leak Detection Pattern
+## Memory Leak Detection Pattern (Functional Approach)
 
-Here's a pattern you can use in your applications to detect memory leaks:
+Here's a functional pattern you can use in your applications to detect memory leaks:
 
 ```javascript
-class MemoryMonitor {
-  constructor(interval = 5000) {
-    this.measurements = [];
-    this.interval = interval;
+import { createMemoryMonitor } from './lib/memory-monitor.js';
+
+// Create monitor with functional composition
+const monitor = createMemoryMonitor({
+  interval: 5000,
+  maxSnapshots: 10,
+  threshold: 1.2,
+  onLeak: (trend) => {
+    console.warn(`⚠️  Potential leak: ${trend.growthRate}% growth`);
   }
-  
-  start() {
-    this.timerId = setInterval(() => {
-      const usage = process.memoryUsage();
-      this.measurements.push({
-        timestamp: Date.now(),
-        heapUsed: usage.heapUsed
-      });
-      
-      if (this.measurements.length > 10) {
-        this.measurements.shift();
-      }
-      
-      if (this.measurements.length >= 5) {
-        const first = this.measurements[0].heapUsed;
-        const last = this.measurements[this.measurements.length - 1].heapUsed;
-        const growthRate = ((last - first) / first * 100).toFixed(2);
-        
-        if (last > first * 1.2) {  // 20% growth
-          console.warn(`⚠️  Potential memory leak: ${growthRate}% growth`);
-        }
-      }
-    }, this.interval);
-  }
-  
-  stop() {
-    if (this.timerId) {
-      clearInterval(this.timerId);
-    }
-  }
-}
+});
+
+// Start monitoring (returns cleanup function)
+const stopMonitoring = monitor.start();
+
+// When done:
+stopMonitoring();
+```
+
+**Functional Benefits**:
+- Pure functions for measurement (no side effects)
+- Explicit cleanup via returned function
+- Composable and testable
+- Immutable snapshot history
+
+## Functional Programming Best Practices for Memory Management
+
+### 1. Use Pure Functions for Data Transformation
+
+```javascript
+// ✅ Pure function - no side effects
+const formatMemorySnapshot = (snapshot) => ({
+  heapUsed: Math.round(snapshot.heapUsed / 1024 / 1024) + ' MB',
+  rss: Math.round(snapshot.rss / 1024 / 1024) + ' MB'
+});
+
+// ❌ Impure - mutates global state
+let formattedData;
+const formatMemoryBad = (snapshot) => {
+  formattedData = { /* ... */ }; // Side effect!
+};
+```
+
+### 2. Return Cleanup Functions Alongside Resources
+
+```javascript
+// ✅ Return cleanup function
+const createResource = () => {
+  const resource = acquireResource();
+  return {
+    resource,
+    cleanup: () => releaseResource(resource)
+  };
+};
+
+// ❌ No way to cleanup
+const createResourceBad = () => {
+  return acquireResource();
+};
+```
+
+### 3. Minimize Closure Scope
+
+```javascript
+// ✅ Extract data before creating closure
+const createHandler = () => {
+  const largeData = fetchLargeData();
+  const needed = extractNeeded(largeData);
+  return () => processData(needed); // Only captures 'needed'
+};
+
+// ❌ Closure captures entire largeData
+const createHandlerBad = () => {
+  const largeData = fetchLargeData();
+  return () => largeData.someProperty;
+};
+```
+
+### 4. Use Function Composition
+
+```javascript
+// ✅ Compose operations
+const processData = pipe(
+  fetchData,
+  filterData,
+  transformData,
+  validateData
+);
+
+// ❌ Imperative with intermediate variables
+const processDataBad = (id) => {
+  const data = fetchData(id);
+  const filtered = filterData(data);
+  const transformed = transformData(filtered);
+  return validateData(transformed);
+};
+```
+
+### 5. Prefer Immutable Data Transformations
+
+```javascript
+// ✅ Immutable - creates new array
+const addItem = (arr, item) => [...arr, item];
+
+// ❌ Mutable - modifies original
+const addItemBad = (arr, item) => {
+  arr.push(item);
+  return arr;
+};
+```
+
+### 6. Make Side Effects Explicit
+
+```javascript
+// ✅ Side effect is isolated and explicit
+const logAndReturn = (data) => {
+  console.log('Processing:', data); // Side effect
+  return data;
+};
+
+// Use tap for side effects in pipelines
+const process = pipe(
+  fetchData,
+  tap(data => console.log('Fetched:', data)),
+  transformData,
+  tap(data => console.log('Transformed:', data))
+);
 ```
 
 ## Best Practices

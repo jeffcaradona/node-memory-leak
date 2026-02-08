@@ -1,16 +1,16 @@
-# Quick Reference Guide - Memory Leak Detection
+# Quick Reference Guide - Memory Leak Detection (Functional Programming)
 
 ## Quick Commands
 
 ```bash
-# Run main demo with all tools
+# Run main demo with functional patterns
 npm run demo
 
-# Run individual leak examples
-npm run leak:global    # Global variable leaks
-npm run leak:closure   # Closure leaks
-npm run leak:events    # Event listener leaks
-npm run leak:timer     # Timer/interval leaks
+# Run individual leak examples (functional approach)
+npm run leak:global    # Global vs functional state management
+npm run leak:closure   # Closure scope minimization
+npm run leak:events    # Explicit cleanup functions
+npm run leak:timer     # Higher-order function patterns
 
 # Debug with Chrome DevTools
 npm run inspect        # Then open chrome://inspect
@@ -18,56 +18,69 @@ npm run inspect        # Then open chrome://inspect
 # Generate heap profile
 npm run heap-prof      # Creates .heapprofile file
 
-# Reproduce production issues locally
-npm run server         # Start leaky HTTP server
+# Reproduce production issues (functional server)
+npm run server         # Start server with functional middleware
 npm run server:inspect # Start server with inspect flag
-npm run loadtest       # Run autocannon load test
+npm run loadtest       # Run load test with functional async
 ```
 
-## Memory Monitoring Code Snippet
+## Functional Memory Monitoring
 
 ```javascript
-// Monitor memory in your application
-const usage = process.memoryUsage();
-console.log({
-  rss: Math.round(usage.rss / 1024 / 1024) + ' MB',
-  heapUsed: Math.round(usage.heapUsed / 1024 / 1024) + ' MB'
-});
+import { getMemorySnapshot, formatMemorySnapshot } from './lib/functional-utils.js';
+
+// Pure function - get snapshot
+const snapshot = getMemorySnapshot();
+
+// Pure function - format snapshot
+const formatted = formatMemorySnapshot(snapshot);
+console.log(formatted);
 ```
 
-## Common Memory Leak Patterns
+## Common Memory Leak Patterns (Functional vs Imperative)
 
-### ❌ BAD: Global variable leak
+### ❌ BAD: Global mutable state
 ```javascript
 const cache = [];
 function addToCache(data) {
-  cache.push(data); // Never cleaned up!
+  cache.push(data); // Mutation + global scope
 }
 ```
 
-### ✅ GOOD: Local with cleanup
+### ✅ GOOD: Explicit state management
 ```javascript
-class Cache {
-  constructor() { this.data = []; }
-  add(item) { this.data.push(item); }
-  clear() { this.data.length = 0; }
-}
+const addToCache = (cache, data) => [...cache, data];
+
+// Or use function composition
+const createCache = () => {
+  let state = [];
+  const add = (data) => { state = [...state, data]; };
+  const get = () => [...state];
+  const clear = () => { state = []; };
+  return { add, get, clear };
+};
 ```
 
 ### ❌ BAD: Forgotten event listener
 ```javascript
 const emitter = new EventEmitter();
 function setup() {
-  emitter.on('data', handleData); // Never removed!
+  emitter.on('data', handleData); // No cleanup!
 }
 ```
 
-### ✅ GOOD: Remove listener
+### ✅ GOOD: Return cleanup function
 ```javascript
-function setup() {
-  emitter.on('data', handleData);
-  return () => emitter.off('data', handleData);
-}
+const setup = (emitter) => {
+  const handler = handleData;
+  emitter.on('data', handler);
+  return () => emitter.off('data', handler); // Cleanup
+};
+
+// Usage
+const cleanup = setup(emitter);
+// Later:
+cleanup();
 ```
 
 ### ❌ BAD: Forgotten timer
@@ -79,14 +92,17 @@ function startProcess() {
 }
 ```
 
-### ✅ GOOD: Clear timer
+### ✅ GOOD: Higher-order function with cleanup
 ```javascript
-function startProcess() {
-  const timer = setInterval(() => {
-    heavyOperation();
-  }, 1000);
-  return () => clearInterval(timer);
-}
+const withTimer = (fn, interval) => {
+  const id = setInterval(fn, interval);
+  return () => clearInterval(id);
+};
+
+// Usage
+const stopTimer = withTimer(heavyOperation, 1000);
+// Later:
+stopTimer();
 ```
 
 ### ❌ BAD: Closure captures everything
@@ -97,13 +113,90 @@ function createHandler() {
 }
 ```
 
-### ✅ GOOD: Extract what you need
+### ✅ GOOD: Extract minimal data with pipe
 ```javascript
-function createHandler() {
-  const hugeData = new Array(1000000);
-  const length = hugeData.length; // Extract value
-  return () => length; // Only captures number
-}
+import { pipe } from './lib/functional-utils.js';
+
+const createHandler = pipe(
+  () => new Array(1000000),     // Create data
+  (data) => data.length,        // Extract what we need
+  (length) => () => length      // Closure only captures number
+);
+```
+
+## Functional Programming Patterns
+
+### Function Composition
+
+```javascript
+import { pipe, compose } from './lib/functional-utils.js';
+
+// Pipe - left to right
+const process = pipe(
+  fetchData,
+  filterData,
+  transformData,
+  saveData
+);
+
+// Compose - right to left (mathematical)
+const process2 = compose(
+  saveData,
+  transformData,
+  filterData,
+  fetchData
+);
+
+process(input); // Easier to read data flow
+```
+
+### Pure Functions
+
+```javascript
+// ✅ Pure - same input = same output, no side effects
+const formatMB = (bytes) => `${Math.round(bytes / 1024 / 1024)} MB`;
+
+// ❌ Impure - depends on external state
+let multiplier = 1024;
+const formatMBBad = (bytes) => `${Math.round(bytes / multiplier / 1024)} MB`;
+```
+
+### Immutable Operations
+
+```javascript
+// ✅ Immutable array operations
+const append = (item) => (arr) => [...arr, item];
+const remove = (index) => (arr) => [
+  ...arr.slice(0, index),
+  ...arr.slice(index + 1)
+];
+
+// ✅ Immutable object operations
+const updateProp = (key, value) => (obj) => ({
+  ...obj,
+  [key]: value
+});
+```
+
+### Resource Management Pattern
+
+```javascript
+// Pattern: Return resource + cleanup
+const createResource = () => {
+  const resource = acquireResource();
+  const cleanup = () => releaseResource(resource);
+  return { resource, cleanup };
+};
+
+// Pattern: Higher-order function for auto-cleanup
+const withResource = (fn) => {
+  const { resource, cleanup } = createResource();
+  try {
+    return fn(resource);
+  } finally {
+    cleanup();
+  }
+};
 ```
 
 ## Debugging Workflow

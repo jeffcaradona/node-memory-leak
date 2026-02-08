@@ -1,167 +1,181 @@
 /**
- * Memory Leak Detection Demo
+ * Memory Leak Detection Demo (Functional Approach)
  * 
- * This demo shows how to use Node.js built-in tools to detect and analyze memory leaks:
- * 1. process.memoryUsage() - Monitor memory in real-time
- * 2. --inspect flag - Use Chrome DevTools for profiling
- * 3. --heap-prof flag - Generate heap snapshots
- * 4. --expose-gc flag - Manually trigger garbage collection for testing
+ * This demo shows how to use Node.js built-in tools with functional programming:
+ * 1. Pure functions for memory measurement
+ * 2. Function composition for data transformation
+ * 3. Explicit side effect management
+ * 4. Functional memory monitoring patterns
  */
 
-console.log('=== Node.js Memory Leak Detection Tools Demo ===\n');
+import { 
+  getMemorySnapshot, 
+  formatMemorySnapshot,
+  logMemorySnapshot,
+  pipe,
+  tap,
+  createTimerCleanup
+} from '../lib/functional-utils.js';
+import { createMemoryMonitor } from '../lib/memory-monitor.js';
 
-// Tool 1: process.memoryUsage() - Built-in memory monitoring
-console.log('1. PROCESS.MEMORYUSAGE() - Real-time Memory Monitoring');
-console.log('   This API provides instant memory usage information:\n');
+console.log('=== Node.js Memory Leak Detection Tools Demo (Functional Paradigm) ===\n');
 
-function displayMemoryUsage() {
-  const usage = process.memoryUsage();
-  return {
-    rss: `${Math.round(usage.rss / 1024 / 1024)} MB`, // Resident Set Size
-    heapTotal: `${Math.round(usage.heapTotal / 1024 / 1024)} MB`, // Total heap allocated
-    heapUsed: `${Math.round(usage.heapUsed / 1024 / 1024)} MB`, // Heap actually used
-    external: `${Math.round(usage.external / 1024 / 1024)} MB`, // C++ objects bound to JS
-    arrayBuffers: `${Math.round(usage.arrayBuffers / 1024 / 1024)} MB` // ArrayBuffers and SharedArrayBuffers
-  };
-}
+// ===== 1. PURE FUNCTIONS FOR MEMORY MONITORING =====
 
-console.log('   Initial memory:', displayMemoryUsage());
+console.log('1. FUNCTIONAL MEMORY MONITORING - Pure Functions\n');
+
+// Pure function pipeline for memory display
+const displayMemory = pipe(
+  getMemorySnapshot,
+  formatMemorySnapshot,
+  tap(formatted => {
+    console.log('   Current memory:', formatted);
+  })
+);
+
+displayMemory();
 console.log();
 
-// Simulate some memory allocation
-const data = new Array(1000000).fill('test');
-console.log('   After allocating ~10MB:', displayMemoryUsage());
+// ===== 2. IMMUTABLE DATA TRANSFORMATIONS =====
+
+console.log('2. IMMUTABLE DATA OPERATIONS\n');
+
+// Pure function: Create test data
+const createTestData = size => new Array(size).fill('test');
+
+// Pure function: Calculate data size
+const calculateSize = data => data.length;
+
+// Composed operation
+const allocateAndMeasure = size => pipe(
+  () => createTestData(size),
+  tap(data => console.log(`   Allocated ${calculateSize(data)} items`)),
+  () => getMemorySnapshot(),
+  formatMemorySnapshot,
+  formatted => console.log('   Memory after allocation:', formatted)
+)();
+
+allocateAndMeasure(1000000);
 console.log();
 
-// Tool 2: Manual Garbage Collection (requires --expose-gc flag)
-console.log('2. MANUAL GARBAGE COLLECTION - Testing Memory Release');
+// ===== 3. FUNCTIONAL GARBAGE COLLECTION =====
+
+console.log('3. FUNCTIONAL GC TESTING\n');
 console.log('   Run with: node --expose-gc examples/demo.js\n');
 
 if (global.gc) {
-  console.log('   ✓ Garbage collection is available');
-  console.log('   Before GC:', displayMemoryUsage());
+  console.log('   ✓ GC available - demonstrating functional cleanup pattern\n');
   
-  // Clear the data reference
-  data.length = 0;
+  // Function that creates and cleans up data
+  const withGarbageCollection = (fn) => {
+    const before = getMemorySnapshot();
+    console.log('   Before:', formatMemorySnapshot(before).heapUsed);
+    
+    fn(); // Execute function
+    
+    global.gc(); // Trigger GC
+    
+    const after = getMemorySnapshot();
+    console.log('   After GC:', formatMemorySnapshot(after).heapUsed);
+  };
   
-  // Force garbage collection
-  global.gc();
+  // Test with scoped data
+  withGarbageCollection(() => {
+    const tempData = createTestData(1000000);
+    // Data goes out of scope after this function
+  });
   
-  console.log('   After GC:', displayMemoryUsage());
   console.log();
 } else {
-  console.log('   ✗ Garbage collection not available');
-  console.log('   Run with: node --expose-gc examples/demo.js');
-  console.log();
+  console.log('   ✗ GC not available');
+  console.log('   Run with: node --expose-gc examples/demo.js\n');
 }
 
-// Tool 3: Chrome DevTools Integration
-console.log('3. CHROME DEVTOOLS - Visual Memory Profiling');
+// ===== 4. CHROME DEVTOOLS INTEGRATION =====
+
+console.log('4. CHROME DEVTOOLS - Visual Memory Profiling');
 console.log('   Run with: node --inspect examples/demo.js');
-console.log('   Then open Chrome and go to: chrome://inspect');
-console.log();
-console.log('   Features available:');
-console.log('   • Take heap snapshots');
-console.log('   • Compare snapshots to find leaks');
-console.log('   • Record allocation timeline');
-console.log('   • See memory allocation by function');
-console.log();
+console.log('   Then open Chrome and go to: chrome://inspect\n');
 
-// Tool 4: Heap Profiling
-console.log('4. HEAP PROFILING - Automated Heap Snapshots');
-console.log('   Run with: node --heap-prof examples/demo.js');
-console.log('   This generates a .heapprofile file you can analyze in Chrome DevTools');
-console.log();
+// ===== 5. FUNCTIONAL MEMORY MONITOR =====
 
-// Tool 5: Memory Leak Detection Pattern
-console.log('5. MEMORY LEAK DETECTION PATTERN');
-console.log('   Here\'s a pattern to detect leaks in your application:\n');
+console.log('5. FUNCTIONAL MEMORY MONITOR PATTERN\n');
+console.log('   Creating functional monitor with composition...\n');
 
-class MemoryMonitor {
-  constructor(interval = 1000) {
-    this.interval = interval;
-    this.measurements = [];
-    this.timerId = null;
+// Functional monitor with leak detection
+const monitor = createMemoryMonitor({
+  interval: 500,
+  maxSnapshots: 10,
+  threshold: 1.1,
+  onLeak: (trend) => {
+    console.log(`   ⚠️  Leak detected! Growth rate: ${trend.growthRate}%`);
   }
-  
-  start() {
-    console.log('   Starting memory monitor...');
-    this.timerId = setInterval(() => {
-      const usage = process.memoryUsage();
-      this.measurements.push({
-        timestamp: Date.now(),
-        heapUsed: usage.heapUsed,
-        rss: usage.rss
-      });
-      
-      // Keep only last 10 measurements
-      if (this.measurements.length > 10) {
-        this.measurements.shift();
-      }
-      
-      // Check for consistent growth (potential leak)
-      if (this.measurements.length >= 5) {
-        const trend = this.analyzeTrend();
-        if (trend.isGrowing) {
-          console.log(`   ⚠️  Potential leak detected! Heap growing: ${trend.growthRate}%`);
-        }
-      }
-    }, this.interval);
-  }
-  
-  stop() {
-    if (this.timerId) {
-      clearInterval(this.timerId);
-      console.log('   Stopped memory monitor');
-    }
-  }
-  
-  analyzeTrend() {
-    const recent = this.measurements.slice(-5);
-    const first = recent[0].heapUsed;
-    const last = recent[recent.length - 1].heapUsed;
-    const growthRate = ((last - first) / first * 100).toFixed(2);
-    
-    return {
-      isGrowing: last > first * 1.1, // 10% growth threshold
-      growthRate
-    };
-  }
-}
+});
 
-// Demo the memory monitor
-const monitor = new MemoryMonitor(500);
-monitor.start();
+// Start monitoring (returns cleanup function)
+const stopMonitoring = monitor.start();
 
-// Simulate a memory leak
-const leakyArray = [];
-const leakInterval = setInterval(() => {
-  leakyArray.push(new Array(100000).fill('leak'));
-}, 600);
+// ===== 6. SIMULATE LEAK USING FUNCTIONAL PATTERNS =====
 
-// Stop after 5 seconds
+// Pure function: Create leak data batch
+const createLeakBatch = () => new Array(100000).fill('leak');
+
+// Impure but explicit: Accumulate data (demonstrates leak)
+let accumulatedData = [];
+const accumulateLeak = () => {
+  accumulatedData = [...accumulatedData, createLeakBatch()];
+};
+
+// Create leak with explicit side effects
+const leakTimer = setInterval(accumulateLeak, 600);
+const stopLeak = createTimerCleanup(leakTimer);
+
+// ===== 7. CLEANUP AND SUMMARY =====
+
 setTimeout(() => {
-  clearInterval(leakInterval);
-  monitor.stop();
+  stopLeak(); // Stop creating leaks
+  stopMonitoring(); // Stop monitoring
   
-  console.log('\n6. SUMMARY - Best Practices for Memory Leak Prevention:');
-  console.log('   • Always remove event listeners when done');
-  console.log('   • Clear intervals and timeouts');
-  console.log('   • Avoid global variables for temporary data');
-  console.log('   • Be careful with closures capturing large objects');
-  console.log('   • Use WeakMap/WeakSet for caches that shouldn\'t prevent GC');
-  console.log('   • Monitor memory usage in production');
-  console.log('   • Profile regularly during development');
-  console.log('\n7. NEXT STEPS:');
-  console.log('   • Run individual leak examples:');
-  console.log('     npm run leak:global');
-  console.log('     npm run leak:closure');
-  console.log('     npm run leak:events');
-  console.log('     npm run leak:timer');
-  console.log('   • Profile with Chrome DevTools:');
-  console.log('     npm run inspect');
-  console.log('   • Generate heap profile:');
-  console.log('     npm run heap-prof');
+  console.log('\n6. FUNCTIONAL PROGRAMMING PRINCIPLES FOR MEMORY MANAGEMENT:\n');
+  console.log('   ✓ Pure functions for measurement (no side effects)');
+  console.log('   ✓ Immutable data transformations');
+  console.log('   ✓ Function composition for complex operations');
+  console.log('   ✓ Explicit side effect isolation');
+  console.log('   ✓ Return cleanup functions (resource management)');
+  console.log('   ✓ Higher-order functions for reusable patterns');
+  console.log();
+  
+  console.log('7. FUNCTIONAL MEMORY LEAK PREVENTION:\n');
+  console.log('   ❌ Avoid: Implicit state mutations');
+  console.log('   ✅ Use: Pure functions with explicit return values\n');
+  
+  console.log('   ❌ Avoid: Hidden resource lifecycles');
+  console.log('   ✅ Use: Return cleanup functions alongside resources\n');
+  
+  console.log('   ❌ Avoid: Accumulating data in module scope');
+  console.log('   ✅ Use: Pass state explicitly through parameters\n');
+  
+  console.log('   ❌ Avoid: Closures capturing large objects');
+  console.log('   ✅ Use: Extract minimal data before creating closures\n');
+  
+  console.log('8. FUNCTIONAL PATTERNS DEMONSTRATED:\n');
+  console.log('   • pipe/compose - Function composition');
+  console.log('   • Pure functions - Deterministic, no side effects');
+  console.log('   • Immutability - Data transformations, not mutations');
+  console.log('   • HOFs - Functions that return functions');
+  console.log('   • Explicit cleanup - Resource management functions');
+  console.log();
+  
+  console.log('9. NEXT STEPS:\n');
+  console.log('   Run functional examples:');
+  console.log('     npm run leak:global   - Functional vs imperative approaches');
+  console.log('     npm run leak:closure  - Minimizing closure scope');
+  console.log('     npm run leak:events   - Functional event management');
+  console.log('     npm run leak:timer    - Functional timer patterns');
+  console.log();
+  console.log('   Advanced debugging:');
+  console.log('     npm run inspect       - Chrome DevTools integration');
+  console.log('     npm run heap-prof     - Generate heap profile');
   console.log();
   
   process.exit(0);
